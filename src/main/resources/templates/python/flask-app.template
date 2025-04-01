@@ -1,0 +1,187 @@
+{!questions}
+projectName=What is your project name (e.g., flask-app)?
+basePackage=What is your base package name (e.g., com.example.app)?
+description=Project description (press enter for default):A Flask web application with basic structure and configuration.
+{end_questions}
+
+{!file}requirements.txt{end_file}
+Flask==3.0.2
+python-dotenv==1.0.1
+pytest==8.0.2
+black==24.1.1
+flake8==7.0.0
+
+{!file}src/{!basePackage}/__init__.py{end_file}
+from flask import Flask
+from dotenv import load_dotenv
+import os
+
+def create_app():
+    app = Flask(__name__)
+    load_dotenv()
+    
+    # Configure the app
+    app.config.from_object('config.default')
+    
+    # Register blueprints
+    from .routes import main
+    app.register_blueprint(main)
+    
+    return app
+
+{!file}src/{!basePackage}/routes.py{end_file}
+from flask import Blueprint, jsonify
+
+main = Blueprint('main', __name__)
+
+@main.route('/')
+def index():
+    return jsonify({"message": "Welcome to Flask API"})
+
+@main.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"})
+
+{!file}src/{!basePackage}/config/default.py{end_file}
+import os
+
+class Config:
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev')
+    DEBUG = os.getenv('FLASK_ENV') == 'development'
+
+{!file}src/{!basePackage}/tests/test_routes.py{end_file}
+import pytest
+from {!basePackage} import create_app
+
+@pytest.fixture
+def app():
+    app = create_app()
+    app.config['TESTING'] = True
+    return app
+
+@pytest.fixture
+def client(app):
+    return app.test_client()
+
+def test_index(client):
+    response = client.get('/')
+    assert response.status_code == 200
+    assert response.json['message'] == 'Welcome to Flask API'
+
+def test_health_check(client):
+    response = client.get('/health')
+    assert response.status_code == 200
+    assert response.json['status'] == 'healthy'
+
+{!file}.env{end_file}
+FLASK_APP=src.{!basePackage}
+FLASK_ENV=development
+SECRET_KEY=your-secret-key-here
+
+{!file}.gitignore{end_file}
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment variables
+.env
+
+# Test coverage
+.coverage
+htmlcov/
+
+{!file}README.md{end_file}
+# {!projectName}
+
+{!description}
+
+## Project Structure
+```
+src/
+└── {!basePackage}/
+    ├── __init__.py      # Application factory
+    ├── routes.py        # Route definitions
+    ├── config/          # Configuration files
+    │   └── default.py
+    └── tests/           # Test files
+        └── test_routes.py
+```
+
+## Setup
+
+1. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+## Running the Application
+
+Development mode:
+```bash
+flask run
+```
+
+Production mode:
+```bash
+gunicorn src.{!basePackage}:create_app()
+```
+
+## Testing
+
+Run tests:
+```bash
+pytest
+```
+
+## Code Style
+
+Format code:
+```bash
+black src/
+```
+
+Check code style:
+```bash
+flake8 src/
+``` 

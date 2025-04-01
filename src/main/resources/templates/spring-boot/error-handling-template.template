@@ -1,0 +1,187 @@
+{!variables}
+basePackage=com.example.demo
+{end_variables}
+
+{!file}src/main/java/{!basePackage}/exception/GlobalExceptionHandler.java{end_file}
+package {!basePackage}.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.ConstraintViolationException;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(EntityNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiError handleEntityNotFound(EntityNotFoundException ex) {
+        return new ApiError(
+            HttpStatus.NOT_FOUND,
+            "Resource not found",
+            ex.getMessage(),
+            LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ValidationError handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+        return new ValidationError(
+            HttpStatus.BAD_REQUEST,
+            "Validation failed",
+            errors,
+            LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ValidationError handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getConstraintViolations().forEach(violation -> {
+            String fieldName = violation.getPropertyPath().toString();
+            String errorMessage = violation.getMessage();
+            errors.put(fieldName, errorMessage);
+        });
+        return new ValidationError(
+            HttpStatus.BAD_REQUEST,
+            "Constraint violation",
+            errors,
+            LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
+        ApiError error = new ApiError(
+            ex.getStatus(),
+            "Business rule violation",
+            ex.getMessage(),
+            LocalDateTime.now()
+        );
+        return new ResponseEntity<>(error, ex.getStatus());
+    }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiError handleAllUncaughtException(Exception ex) {
+        return new ApiError(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Internal server error",
+            "An unexpected error occurred",
+            LocalDateTime.now()
+        );
+    }
+}
+
+{!file}src/main/java/{!basePackage}/exception/ApiError.java{end_file}
+package {!basePackage}.exception;
+
+import org.springframework.http.HttpStatus;
+import java.time.LocalDateTime;
+
+public record ApiError(
+    HttpStatus status,
+    String error,
+    String message,
+    LocalDateTime timestamp
+) {}
+
+{!file}src/main/java/{!basePackage}/exception/ValidationError.java{end_file}
+package {!basePackage}.exception;
+
+import org.springframework.http.HttpStatus;
+import java.time.LocalDateTime;
+import java.util.Map;
+
+public record ValidationError(
+    HttpStatus status,
+    String error,
+    Map<String, String> validationErrors,
+    LocalDateTime timestamp
+) {}
+
+{!file}src/main/java/{!basePackage}/exception/BusinessException.java{end_file}
+package {!basePackage}.exception;
+
+import org.springframework.http.HttpStatus;
+
+public class BusinessException extends RuntimeException {
+    private final HttpStatus status;
+
+    public BusinessException(String message, HttpStatus status) {
+        super(message);
+        this.status = status;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/validation/ValidationGroups.java{end_file}
+package {!basePackage}.validation;
+
+public interface ValidationGroups {
+    interface Create {}
+    interface Update {}
+}
+
+{!file}src/main/java/{!basePackage}/dto/ExampleRequestDTO.java{end_file}
+package {!basePackage}.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Email;
+import {!basePackage}.validation.ValidationGroups.Create;
+import {!basePackage}.validation.ValidationGroups.Update;
+
+public record ExampleRequestDTO(
+    @NotBlank(message = "Name is required", groups = {Create.class, Update.class})
+    @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
+    String name,
+
+    @Email(message = "Must be a valid email address")
+    @NotBlank(message = "Email is required", groups = Create.class)
+    String email
+) {}
+
+{!file}src/main/java/{!basePackage}/controller/ExampleValidatedController.java{end_file}
+package {!basePackage}.controller;
+
+import {!basePackage}.dto.ExampleRequestDTO;
+import {!basePackage}.validation.ValidationGroups.Create;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/example")
+@Validated
+public class ExampleValidatedController {
+
+    @PostMapping
+    public ResponseEntity<String> createExample(
+            @Validated(Create.class) @RequestBody ExampleRequestDTO request) {
+        // Implementation
+        if (someBusinessRule) {
+            throw new BusinessException("Business rule violated", HttpStatus.CONFLICT);
+        }
+        return ResponseEntity.ok("Created");
+    }
+}

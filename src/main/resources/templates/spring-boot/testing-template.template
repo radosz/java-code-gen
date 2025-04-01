@@ -1,0 +1,247 @@
+{!variables}
+basePackage=com.example.demo
+entityName=Entity
+{end_variables}
+
+{!file}build.gradle{end_file}
+// Add these dependencies to your build.gradle
+dependencies {
+    // Testing Dependencies
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'com.github.tomakehurst:wiremock-jre8-standalone:2.35.1'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+    testImplementation 'io.rest-assured:rest-assured'
+    testImplementation 'org.awaitility:awaitility:4.2.0'
+}
+
+{!file}src/test/java/{!basePackage}/unit/{!entityName}ServiceTest.java{end_file}
+package {!basePackage}.unit;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.repository.{!entityName}Repository;
+import {!basePackage}.service.{!entityName}Service;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class {!entityName}ServiceTest {
+
+    @Mock
+    private {!entityName}Repository repository;
+
+    @InjectMocks
+    private {!entityName}Service service;
+
+    private {!entityName} testEntity;
+
+    @BeforeEach
+    void setUp() {
+        testEntity = new {!entityName}();
+        // Set up test entity properties
+    }
+
+    @Test
+    void shouldCreate{!entityName}() {
+        when(repository.save(any({!entityName}.class))).thenReturn(testEntity);
+
+        {!entityName} result = service.save(testEntity);
+
+        assertThat(result).isNotNull();
+        verify(repository).save(any({!entityName}.class));
+    }
+
+    @Test
+    void shouldFind{!entityName}ById() {
+        when(repository.findById(anyLong())).thenReturn(Optional.of(testEntity));
+
+        {!entityName} result = service.findById(1L);
+
+        assertThat(result).isNotNull();
+        verify(repository).findById(1L);
+    }
+}
+
+{!file}src/test/java/{!basePackage}/integration/BaseIntegrationTest.java{end_file}
+package {!basePackage}.integration;
+
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Testcontainers
+public abstract class BaseIntegrationTest {
+
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+}
+
+{!file}src/test/java/{!basePackage}/integration/{!entityName}ControllerTest.java{end_file}
+package {!basePackage}.integration;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.repository.{!entityName}Repository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@AutoConfigureMockMvc
+class {!entityName}ControllerTest extends BaseIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private {!entityName}Repository repository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private {!entityName} testEntity;
+
+    @BeforeEach
+    void setUp() {
+        repository.deleteAll();
+        testEntity = new {!entityName}();
+        // Set up test entity properties
+        testEntity = repository.save(testEntity);
+    }
+
+    @Test
+    void shouldGet{!entityName}ById() throws Exception {
+        mockMvc.perform(get("/api/entities/{id}", testEntity.getId())
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(testEntity.getId()));
+    }
+}
+
+{!file}src/test/java/{!basePackage}/external/ExternalApiTest.java{end_file}
+package {!basePackage}.external;
+
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.WireMock;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.MediaType;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static io.restassured.RestAssured.*;
+import static org.hamcrest.Matchers.*;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class ExternalApiTest {
+
+    private WireMockServer wireMockServer;
+
+    @LocalServerPort
+    private Integer port;
+
+    @BeforeEach
+    void setUp() {
+        wireMockServer = new WireMockServer(8089);
+        wireMockServer.start();
+        WireMock.configureFor("localhost", 8089);
+        baseURI = "http://localhost";
+        basePath = "/api";
+        port(port);
+    }
+
+    @AfterEach
+    void tearDown() {
+        wireMockServer.stop();
+    }
+
+    @Test
+    void shouldCallExternalApi() {
+        // Setup mock response
+        stubFor(get(urlEqualTo("/external/resource"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                        .withBody("{\"key\":\"value\"}")));
+
+        // Test your endpoint that calls external API
+        given()
+            .when()
+                .get("/your-endpoint")
+            .then()
+                .statusCode(200)
+                .body("key", equalTo("value"));
+
+        // Verify the external call was made
+        verify(getRequestedFor(urlEqualTo("/external/resource")));
+    }
+}
+
+{!file}src/test/resources/application-test.properties{end_file}
+# Test Configuration
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+
+# Logging for tests
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+# External API mock configuration
+external.api.base-url=http://localhost:8089
+
+{!file}src/test/resources/wiremock/mappings/external-api.json{end_file}
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/external/resource"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"key\":\"value\"}"
+      }
+    }
+  ]
+}
+
+{!file}src/test/resources/logback-test.xml{end_file}
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+    <logger name="org.testcontainers" level="INFO"/>
+    <logger name="com.github.dockerjava" level="WARN"/>
+    <logger name="org.hibernate.SQL" level="DEBUG"/>
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>
+</configuration>

@@ -1,0 +1,181 @@
+{!questions}
+projectName=What is your project name (e.g., builder-pattern)?
+basePackage=What is your base package name (e.g., com.example.patterns)?
+description=Project description (press enter for default):Builder Pattern implementation for constructing complex objects.
+{end_questions}
+
+{!file}src/main/java/{!basePackage}/builder/Product.java{end_file}
+package {!basePackage}.builder;
+
+public class Product {
+    private String partA;
+    private String partB;
+    private String partC;
+
+    public void setPartA(String partA) {
+        this.partA = partA;
+    }
+
+    public void setPartB(String partB) {
+        this.partB = partB;
+    }
+
+    public void setPartC(String partC) {
+        this.partC = partC;
+    }
+
+    @Override
+    public String toString() {
+        return "Product{" +
+                "partA='" + partA + '\'' +
+                ", partB='" + partB + '\'' +
+                ", partC='" + partC + '\'' +
+                '}';
+    }
+}
+
+{!file}src/main/java/{!basePackage}/builder/Builder.java{end_file}
+package {!basePackage}.builder;
+
+public interface Builder {
+    void buildPartA();
+    void buildPartB();
+    void buildPartC();
+    Product getResult();
+}
+
+{!file}src/main/java/{!basePackage}/builder/ConcreteBuilder.java{end_file}
+package {!basePackage}.builder;
+
+public class ConcreteBuilder implements Builder {
+    private Product product;
+
+    public ConcreteBuilder() {
+        this.product = new Product();
+    }
+
+    @Override
+    public void buildPartA() {
+        product.setPartA("Part A");
+    }
+
+    @Override
+    public void buildPartB() {
+        product.setPartB("Part B");
+    }
+
+    @Override
+    public void buildPartC() {
+        product.setPartC("Part C");
+    }
+
+    @Override
+    public Product getResult() {
+        return product;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/builder/Director.java{end_file}
+package {!basePackage}.builder;
+
+public class Director {
+    private Builder builder;
+
+    public Director(Builder builder) {
+        this.builder = builder;
+    }
+
+    public void construct() {
+        builder.buildPartA();
+        builder.buildPartB();
+        builder.buildPartC();
+    }
+}
+
+{!file}README.md{end_file}
+# Builder Pattern
+
+The Builder Pattern is a creational design pattern that separates the construction of a complex object from its representation. It allows the same construction process to create different representations.
+
+## Structure
+
+- **Product**: The complex object being built
+- **Builder**: Abstract interface for creating parts of a Product object
+- **ConcreteBuilder**: Constructs and assembles parts of the product
+- **Director**: Constructs the object using the Builder interface
+
+## Usage
+
+```java
+// Create the concrete builder
+Builder builder = new ConcreteBuilder();
+
+// Create the director with the builder
+Director director = new Director(builder);
+
+// Construct the product
+director.construct();
+
+// Get the final product
+Product product = builder.getResult();
+System.out.println(product);
+```
+
+## Benefits
+
+- Allows step-by-step construction of complex objects
+- Enables construction of different product representations using the same process
+- Isolates complex construction code from the product's business logic
+- Provides better control over the construction process
+```
+
+## Modern Implementation
+
+Java also supports a more fluent builder pattern commonly used with method chaining:
+
+```java
+public class Product {
+    private final String partA;
+    private final String partB;
+    private final String partC;
+
+    private Product(Builder builder) {
+        this.partA = builder.partA;
+        this.partB = builder.partB;
+        this.partC = builder.partC;
+    }
+
+    public static class Builder {
+        private String partA;
+        private String partB;
+        private String partC;
+
+        public Builder partA(String partA) {
+            this.partA = partA;
+            return this;
+        }
+
+        public Builder partB(String partB) {
+            this.partB = partB;
+            return this;
+        }
+
+        public Builder partC(String partC) {
+            this.partC = partC;
+            return this;
+        }
+
+        public Product build() {
+            return new Product(this);
+        }
+    }
+}
+
+// Usage:
+Product product = new Product.Builder()
+    .partA("Part A")
+    .partB("Part B")
+    .partC("Part C")
+    .build();
+```
+

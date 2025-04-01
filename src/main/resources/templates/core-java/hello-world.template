@@ -1,0 +1,130 @@
+{!questions}
+projectName=What is your project name (e.g., hello-world)?
+basePackage=What is your base package name (e.g., com.example.hello)?
+description=Project description (press enter for default):A simple Hello World application demonstrating basic Java project structure.
+{end_questions}
+
+{!file}build.gradle{end_file}
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = '{!basePackage}'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
+
+application {
+    mainClass = '{!basePackage}.Main'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+{!file}src/main/java/{!basePackage}/Main.java{end_file}
+package {!basePackage};
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}
+
+{!file}src/test/java/{!basePackage}/MainTest.java{end_file}
+package {!basePackage};
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class MainTest {
+    @Test
+    void testMain() {
+        // Add your test cases here
+        assertTrue(true, "This is a placeholder test");
+    }
+}
+
+{!file}.gitignore{end_file}
+# Gradle
+.gradle/
+build/
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+.vscode/
+
+# Compiled class files
+*.class
+
+# Package files
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+{!file}README.md{end_file}
+# {!projectName}
+
+{!description}
+
+## Overview
+
+This is a simple Hello World application that demonstrates:
+- Basic Java project structure
+- Gradle build configuration
+- Unit testing setup
+- Proper package organization
+
+## Building and Running
+
+Build the project:
+```bash
+./gradlew build
+```
+
+Run the example:
+```bash
+./gradlew run
+```
+
+Run tests:
+```bash
+./gradlew test
+```
+
+## Project Structure
+```
+src/
+├── main/java/
+│   └── {!basePackage}/
+│       └── Main.java
+└── test/java/
+    └── {!basePackage}/
+        └── MainTest.java
+```
+

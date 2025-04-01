@@ -1,0 +1,133 @@
+{!variables}
+basePackage=com.example.demo
+entityName=Entity
+entityNameLower=|TrimNoSpaces: {!entityName}|
+tableName=entities
+{end_variables}
+
+{!file}src/main/java/{!basePackage}/model/{!entityName}.java{end_file}
+package {!basePackage}.model;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.Data;
+
+@Data
+@Entity
+@Table(name = "{!tableName}")
+public class {!entityName} {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    // Add your entity fields here
+}
+
+{!file}src/main/java/{!basePackage}/repository/{!entityName}Repository.java{end_file}
+package {!basePackage}.repository;
+
+import {!basePackage}.model.{!entityName};
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface {!entityName}Repository extends JpaRepository<{!entityName}, Long> {
+    // Add custom query methods here
+}
+
+{!file}src/main/java/{!basePackage}/service/{!entityName}Service.java{end_file}
+package {!basePackage}.service;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.repository.{!entityName}Repository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class {!entityName}Service {
+    private final {!entityName}Repository repository;
+
+    @Autowired
+    public {!entityName}Service({!entityName}Repository repository) {
+        this.repository = repository;
+    }
+
+    public List<{!entityName}> findAll() {
+        return repository.findAll();
+    }
+
+    public Optional<{!entityName}> findById(Long id) {
+        return repository.findById(id);
+    }
+
+    public {!entityName} save({!entityName} entity) {
+        return repository.save(entity);
+    }
+
+    public void deleteById(Long id) {
+        repository.deleteById(id);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/controller/{!entityName}Controller.java{end_file}
+package {!basePackage}.controller;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.service.{!entityName}Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/{!entityNameLower}s")
+public class {!entityName}Controller {
+    private final {!entityName}Service service;
+
+    @Autowired
+    public {!entityName}Controller({!entityName}Service service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public List<{!entityName}> getAll() {
+        return service.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<{!entityName}> getById(@PathVariable Long id) {
+        return service.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping
+    public {!entityName} create(@RequestBody {!entityName} entity) {
+        return service.save(entity);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<{!entityName}> update(@PathVariable Long id, @RequestBody {!entityName} entity) {
+        return service.findById(id)
+                .map(existing -> {
+                    entity.setId(id);
+                    return ResponseEntity.ok(service.save(entity));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        return service.findById(id)
+                .map(existing -> {
+                    service.deleteById(id);
+                    return ResponseEntity.ok().<Void>build();
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+}

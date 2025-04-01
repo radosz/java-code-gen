@@ -1,0 +1,181 @@
+{!questions}
+projectName=What is your project name (e.g., singleton-example)?
+basePackage=What is your base package name (e.g., com.example.patterns)?
+description=Project description (press enter for default):A Java implementation of the Singleton design pattern, demonstrating thread-safe lazy initialization.
+singletonName=What is your Singleton class name (e.g., Configuration)?
+{end_questions}
+
+{!file}build.gradle{end_file}
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = '{!basePackage}'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
+
+application {
+    mainClass = '{!basePackage}.Main'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+{!file}src/main/java/{!basePackage}/{!singletonName}.java{end_file}
+package {!basePackage};
+
+/**
+ * A thread-safe singleton implementation using the initialization-on-demand holder pattern.
+ * This implementation ensures:
+ * 1. Lazy initialization
+ * 2. Thread safety without using synchronization
+ * 3. High performance
+ */
+public class {!singletonName} {
+    // Private constructor prevents instantiation from other classes
+    private {!singletonName}() {
+        // Protection from reflection
+        if (SingletonHolder.INSTANCE != null) {
+            throw new IllegalStateException("Singleton already initialized");
+        }
+    }
+
+    /**
+     * The initialization-on-demand holder idiom
+     * Static holder class for singleton instance
+     */
+    private static class SingletonHolder {
+        static final {!singletonName} INSTANCE = new {!singletonName}();
+    }
+
+    /**
+     * Returns the singleton instance
+     * @return the singleton instance
+     */
+    public static {!singletonName} getInstance() {
+        return SingletonHolder.INSTANCE;
+    }
+
+    // Example method
+    public String getInfo() {
+        return "I am a singleton instance of {!singletonName}";
+    }
+
+    // Protect against deserialization
+    protected Object readResolve() {
+        return getInstance();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/Main.java{end_file}
+package {!basePackage};
+
+public class Main {
+    public static void main(String[] args) {
+        // Demonstrate singleton usage
+        {!singletonName} instance1 = {!singletonName}.getInstance();
+        System.out.println("Instance 1 info: " + instance1.getInfo());
+
+        {!singletonName} instance2 = {!singletonName}.getInstance();
+        System.out.println("Instance 2 info: " + instance2.getInfo());
+
+        // Demonstrate that both instances are the same
+        System.out.println("Are instances the same? " + (instance1 == instance2));
+    }
+}
+
+{!file}src/test/java/{!basePackage}/{!singletonName}Test.java{end_file}
+package {!basePackage};
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class {!singletonName}Test {
+    @Test
+    void testSingleInstance() {
+        {!singletonName} instance1 = {!singletonName}.getInstance();
+        {!singletonName} instance2 = {!singletonName}.getInstance();
+        
+        assertSame(instance1, instance2, "Both instances should be the same");
+    }
+
+    @Test
+    void testInfo() {
+        {!singletonName} instance = {!singletonName}.getInstance();
+        assertNotNull(instance.getInfo(), "Info should not be null");
+    }
+}
+
+{!file}README.md{end_file}
+# {!projectName}
+
+{!description}
+
+## Singleton Pattern Overview
+
+The Singleton pattern ensures that a class has only one instance and provides a global point of access to that instance. This implementation demonstrates:
+
+- Thread-safe lazy initialization using the initialization-on-demand holder idiom
+- Protection against reflection attacks
+- Proper handling of serialization
+- High performance without synchronization overhead
+
+## Implementation Details
+
+The `{!singletonName}` class implements the Singleton pattern with these features:
+
+1. Private constructor to prevent direct instantiation
+2. Static holder class for lazy initialization
+3. Thread-safe getInstance() method
+4. Protection against reflection and serialization attacks
+
+## Usage Example
+
+```java
+{!singletonName} instance = {!singletonName}.getInstance();
+System.out.println(instance.getInfo());
+```
+
+## Building and Running
+
+Build the project:
+```bash
+./gradlew build
+```
+
+Run the example:
+```bash
+./gradlew run
+```
+
+Run tests:
+```bash
+./gradlew test
+```
+
+## Project Structure
+```
+src/
+├── main/java/
+│   └── {!basePackage}/
+│       ├── {!singletonName}.java
+│       └── Main.java
+└── test/java/
+    └── {!basePackage}/
+        └── {!singletonName}Test.java
+```
+

@@ -1,0 +1,128 @@
+{!variables}
+basePackage=com.example.demo
+applicationName=DemoApplication
+apiTitle=Demo API
+apiDescription=Demo API Documentation
+apiVersion=1.0.0
+{end_variables}
+
+{!file}src/main/java/{!basePackage}/config/OpenApiConfig.java{end_file}
+package {!basePackage}.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("{!apiTitle}")
+                        .version("{!apiVersion}")
+                        .description("{!apiDescription}")
+                        .license(new License().name("Apache 2.0").url("http://springdoc.org")))
+                .components(new Components()
+                        .addSecuritySchemes("bearer-jwt", new SecurityScheme()
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("JWT")));
+    }
+}
+
+{!file}src/main/java/{!basePackage}/controller/ExampleDocumentedController.java{end_file}
+package {!basePackage}.controller;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/example")
+@Tag(name = "Example API", description = "Example API endpoints")
+public class ExampleDocumentedController {
+
+    @Operation(summary = "Get item by ID", description = "Returns an item based on ID")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Item found",
+                content = { @Content(mediaType = "application/json",
+                        schema = @Schema(implementation = ExampleResponse.class)) }),
+        @ApiResponse(responseCode = "404", description = "Item not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @GetMapping("/{id}")
+    public ResponseEntity<ExampleResponse> getItem(
+            @Parameter(description = "ID of item to fetch") @PathVariable Long id) {
+        // Implementation
+        return ResponseEntity.ok(new ExampleResponse());
+    }
+
+    @Operation(summary = "Create new item", description = "Creates a new item")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Item created"),
+        @ApiResponse(responseCode = "400", description = "Invalid input"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PostMapping
+    public ResponseEntity<ExampleResponse> createItem(
+            @Parameter(description = "Item to create") @RequestBody ExampleRequest request) {
+        // Implementation
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ExampleResponse());
+    }
+}
+
+{!file}src/main/resources/application.properties{end_file}
+# OpenAPI/Swagger Configuration
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.swagger-ui.operationsSorter=method
+springdoc.swagger-ui.tagsSorter=alpha
+springdoc.swagger-ui.tryItOutEnabled=true
+springdoc.swagger-ui.filter=true
+
+{!file}build.gradle{end_file}
+plugins {
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'java'
+}
+
+group = '{!basePackage}'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-common:2.3.0'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+bootJar {
+    layered {
+        enabled = true
+    }
+}

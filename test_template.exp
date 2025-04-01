@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+
+# Set timeout
+set timeout 20
+
+# Start the Java application
+spawn java -jar build/libs/ISHCodeGenerator.jar
+
+# Wait for the pattern prompt and send csv_blockexample
+expect "Enter the name of pattern generator ?"
+send "csv_blockexample\r"
+
+# Add a small delay and send cartridge dir
+sleep 1
+send "test_cartridge\r"
+
+# Wait for completion
+expect "DONE!"
+
+# Get the spawn_id status
+catch wait result
+exit [lindex $result 3]

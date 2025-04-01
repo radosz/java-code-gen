@@ -1,0 +1,104 @@
+{!questions}
+projectName=What is your project name (e.g., factory-pattern)?
+basePackage=What is your base package name (e.g., com.example.patterns)?
+description=Project description (press enter for default):Factory Method Pattern implementation with product creation example.
+{end_questions}
+
+{!file}src/main/java/{!basePackage}/factory/Product.java{end_file}
+package {!basePackage}.factory;
+
+public interface Product {
+    void operate();
+}
+
+{!file}src/main/java/{!basePackage}/factory/ConcreteProductA.java{end_file}
+package {!basePackage}.factory;
+
+public class ConcreteProductA implements Product {
+    @Override
+    public void operate() {
+        System.out.println("Operating ConcreteProductA");
+    }
+}
+
+{!file}src/main/java/{!basePackage}/factory/ConcreteProductB.java{end_file}
+package {!basePackage}.factory;
+
+public class ConcreteProductB implements Product {
+    @Override
+    public void operate() {
+        System.out.println("Operating ConcreteProductB");
+    }
+}
+
+{!file}src/main/java/{!basePackage}/factory/Creator.java{end_file}
+package {!basePackage}.factory;
+
+public abstract class Creator {
+    abstract Product createProduct();
+    
+    public void someOperation() {
+        Product product = createProduct();
+        product.operate();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/factory/ConcreteCreatorA.java{end_file}
+package {!basePackage}.factory;
+
+public class ConcreteCreatorA extends Creator {
+    @Override
+    Product createProduct() {
+        return new ConcreteProductA();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/factory/ConcreteCreatorB.java{end_file}
+package {!basePackage}.factory;
+
+public class ConcreteCreatorB extends Creator {
+    @Override
+    Product createProduct() {
+        return new ConcreteProductB();
+    }
+}
+
+{!file}README.md{end_file}
+# Factory Method Pattern
+
+## Purpose
+The Factory Method Pattern defines an interface for creating an object, but lets subclasses decide which class to instantiate. Factory Method lets a class defer instantiation to subclasses.
+
+## Structure
+* Product: Defines the interface of objects the factory method creates
+* ConcreteProduct: Implements the Product interface
+* Creator: Declares the factory method, which returns an object of type Product
+* ConcreteCreator: Overrides the factory method to return an instance of a ConcreteProduct
+
+## Example Use Cases
+* When a class cannot anticipate the class of objects it must create
+* When a class wants its subclasses to specify the objects it creates
+* When classes delegate responsibility to one of several helper subclasses, and you want to localize the knowledge of which helper subclass is the delegate
+
+## Implementation Notes
+This implementation demonstrates a simple factory method pattern where:
+1. `Product` is an interface with an `operate()` method
+2. `ConcreteProductA` and `ConcreteProductB` implement the `Product` interface
+3. `Creator` is an abstract class with an abstract `createProduct()` method and a concrete `someOperation()` method
+4. `ConcreteCreatorA` and `ConcreteCreatorB` extend `Creator` and implement the `createProduct()` method
+
+## Sample Usage
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Create different types of creators
+        Creator creatorA = new ConcreteCreatorA();
+        Creator creatorB = new ConcreteCreatorB();
+        
+        // Use the factory method to create products and operate on them
+        creatorA.someOperation(); // Will create and operate on ConcreteProductA
+        creatorB.someOperation(); // Will create and operate on ConcreteProductB
+    }
+}
+```
+

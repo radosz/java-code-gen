@@ -1,0 +1,103 @@
+{!questions}
+projectName=What is your project name (e.g., strategy-pattern)?
+basePackage=What is your base package name (e.g., com.example.patterns)?
+description=Project description (press enter for default):Strategy Pattern implementation for defining a family of algorithms.
+{end_questions}
+
+{!file}src/main/java/{!basePackage}/strategy/Strategy.java{end_file}
+package {!basePackage}.strategy;
+
+public interface Strategy {
+    int execute(int a, int b);
+}
+
+{!file}src/main/java/{!basePackage}/strategy/AddStrategy.java{end_file}
+package {!basePackage}.strategy;
+
+public class AddStrategy implements Strategy {
+    @Override
+    public int execute(int a, int b) {
+        return a + b;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/strategy/SubtractStrategy.java{end_file}
+package {!basePackage}.strategy;
+
+public class SubtractStrategy implements Strategy {
+    @Override
+    public int execute(int a, int b) {
+        return a - b;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/strategy/MultiplyStrategy.java{end_file}
+package {!basePackage}.strategy;
+
+public class MultiplyStrategy implements Strategy {
+    @Override
+    public int execute(int a, int b) {
+        return a * b;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/strategy/Context.java{end_file}
+package {!basePackage}.strategy;
+
+public class Context {
+    private Strategy strategy;
+
+    public Context(Strategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public void setStrategy(Strategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public int executeStrategy(int a, int b) {
+        return strategy.execute(a, b);
+    }
+}
+
+{!file}README.md{end_file}
+# Strategy Pattern
+
+The Strategy Pattern is a behavioral design pattern that enables selecting an algorithm at runtime. It defines a family of algorithms, encapsulates each one, and makes them interchangeable.
+
+## Structure
+
+- **Strategy**: Declares an interface common to all supported algorithms
+- **ConcreteStrategy**: Implements the algorithm using the Strategy interface
+- **Context**: Maintains a reference to a Strategy object and delegates it to execute the algorithm
+
+## Usage
+
+```java
+// Create strategies
+Strategy addStrategy = new AddStrategy();
+Strategy subtractStrategy = new SubtractStrategy();
+Strategy multiplyStrategy = new MultiplyStrategy();
+
+// Create context with initial strategy
+Context context = new Context(addStrategy);
+
+// Execute strategy
+int resultAdd = context.executeStrategy(10, 5); // 15
+
+// Change strategy
+context.setStrategy(subtractStrategy);
+int resultSubtract = context.executeStrategy(10, 5); // 5
+
+// Change strategy again
+context.setStrategy(multiplyStrategy);
+int resultMultiply = context.executeStrategy(10, 5); // 50
+```
+
+## Benefits
+
+- Algorithms can vary independently from clients that use them
+- Eliminates conditional statements
+- Provides different implementations of the same behavior
+- Easier to extend with new strategies
+

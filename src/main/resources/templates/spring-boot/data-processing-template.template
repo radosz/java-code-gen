@@ -1,0 +1,270 @@
+{!variables}
+basePackage=com.example.demo
+entityName=Entity
+{end_variables}
+
+{!file}build.gradle{end_file}
+// Add these dependencies to your build.gradle
+dependencies {
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+    
+    // Excel/CSV Processing
+    implementation 'org.apache.poi:poi:5.2.3'
+    implementation 'org.apache.poi:poi-ooxml:5.2.3'
+    implementation 'com.opencsv:opencsv:5.7.1'
+    
+    // Batch Processing
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    
+    // Scheduling
+    implementation 'org.springframework.boot:spring-boot-starter-quartz'
+    
+    // Utils
+    implementation 'org.apache.commons:commons-lang3'
+    implementation 'org.apache.commons:commons-collections4'
+}
+
+{!file}src/main/java/{!basePackage}/config/KafkaConfig.java{end_file}
+package {!basePackage}.config;
+
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.*;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class KafkaConfig {
+
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
+
+    @Bean
+    public ProducerFactory<String, Object> producerFactory() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        return new DefaultKafkaProducerFactory<>(config);
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+    @Bean
+    public ConsumerFactory<String, Object> consumerFactory() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, "group_id");
+        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        config.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        return new DefaultKafkaConsumerFactory<>(config);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory = 
+            new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
+        return factory;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/service/DataProcessingService.java{end_file}
+package {!basePackage}.service;
+
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.stereotype.Service;
+import java.io.*;
+import java.util.List;
+import java.util.ArrayList;
+
+@Service
+public class DataProcessingService {
+
+    public List<String[]> readCsv(InputStream inputStream) throws IOException {
+        try (CSVReader reader = new CSVReader(new InputStreamReader(inputStream))) {
+            return reader.readAll();
+        }
+    }
+
+    public void writeCsv(List<String[]> data, OutputStream outputStream) throws IOException {
+        try (CSVWriter writer = new CSVWriter(new OutputStreamWriter(outputStream))) {
+            writer.writeAll(data);
+        }
+    }
+
+    public List<List<String>> readExcel(InputStream inputStream) throws IOException {
+        List<List<String>> result = new ArrayList<>();
+        try (Workbook workbook = new XSSFWorkbook(inputStream)) {
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                List<String> rowData = new ArrayList<>();
+                for (Cell cell : row) {
+                    rowData.add(cell.toString());
+                }
+                result.add(rowData);
+            }
+        }
+        return result;
+    }
+
+    public void writeExcel(List<List<String>> data, OutputStream outputStream) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet();
+            for (int i = 0; i < data.size(); i++) {
+                Row row = sheet.createRow(i);
+                List<String> rowData = data.get(i);
+                for (int j = 0; j < rowData.size(); j++) {
+                    Cell cell = row.createCell(j);
+                    cell.setCellValue(rowData.get(j));
+                }
+            }
+            workbook.write(outputStream);
+        }
+    }
+}
+
+{!file}src/main/java/{!basePackage}/kafka/KafkaProducerService.java{end_file}
+package {!basePackage}.kafka;
+
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
+
+@Service
+public class KafkaProducerService {
+
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    public KafkaProducerService(KafkaTemplate<String, Object> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
+    }
+
+    public void sendMessage(String topic, Object message) {
+        kafkaTemplate.send(topic, message);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/kafka/KafkaConsumerService.java{end_file}
+package {!basePackage}.kafka;
+
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Service;
+
+@Service
+public class KafkaConsumerService {
+
+    @KafkaListener(topics = "topic-name", groupId = "group_id")
+    public void consume(Object message) {
+        // Process the message
+        System.out.println("Received message: " + message);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/scheduler/JobScheduler.java{end_file}
+package {!basePackage}.scheduler;
+
+import org.quartz.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class JobScheduler {
+
+    @Bean
+    public JobDetail processDataJobDetail() {
+        return JobBuilder.newJob(DataProcessingJob.class)
+                .withIdentity("processDataJob")
+                .storeDurably()
+                .build();
+    }
+
+    @Bean
+    public Trigger processDataJobTrigger() {
+        return TriggerBuilder.newTrigger()
+                .forJob(processDataJobDetail())
+                .withIdentity("processDataTrigger")
+                .withSchedule(CronScheduleBuilder.cronSchedule("0 0 1 * * ?"))
+                .build();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/job/DataProcessingJob.java{end_file}
+package {!basePackage}.job;
+
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataProcessingJob implements Job {
+
+    @Override
+    public void execute(JobExecutionContext context) {
+        // Implement your data processing logic here
+        System.out.println("Processing data...");
+    }
+}
+
+{!file}src/main/resources/application.yml{end_file}
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: group_id
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      org.quartz.threadPool.threadCount: 5
+
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+{!file}docker-compose.yml{end_file}
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

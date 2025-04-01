@@ -1,0 +1,151 @@
+{!variables}
+basePackage=com.example.demo
+entityName=Entity
+{end_variables}
+
+{!file}src/test/java/{!basePackage}/controller/{!entityName}ControllerTest.java{end_file}
+package {!basePackage}.controller;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.service.{!entityName}Service;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
+import java.util.Optional;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest({!entityName}Controller.class)
+public class {!entityName}ControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private {!entityName}Service service;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private {!entityName} testEntity;
+
+    @BeforeEach
+    void setUp() {
+        testEntity = new {!entityName}();
+        testEntity.setId(1L);
+        // Set other properties as needed
+    }
+
+    @Test
+    void getAllShouldReturnList() throws Exception {
+        when(service.findAll()).thenReturn(Arrays.asList(testEntity));
+
+        mockMvc.perform(get("/api/entities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(testEntity.getId()));
+    }
+
+    @Test
+    void getByIdShouldReturnEntity() throws Exception {
+        when(service.findById(1L)).thenReturn(Optional.of(testEntity));
+
+        mockMvc.perform(get("/api/entities/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(testEntity.getId()));
+    }
+
+    @Test
+    void createShouldReturnNewEntity() throws Exception {
+        when(service.save(any({!entityName}.class))).thenReturn(testEntity);
+
+        mockMvc.perform(post("/api/entities")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(testEntity)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(testEntity.getId()));
+    }
+}
+
+{!file}src/test/java/{!basePackage}/service/{!entityName}ServiceTest.java{end_file}
+package {!basePackage}.service;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.repository.{!entityName}Repository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+public class {!entityName}ServiceTest {
+
+    @Mock
+    private {!entityName}Repository repository;
+
+    @InjectMocks
+    private {!entityName}Service service;
+
+    private {!entityName} testEntity;
+
+    @BeforeEach
+    void setUp() {
+        testEntity = new {!entityName}();
+        testEntity.setId(1L);
+        // Set other properties as needed
+    }
+
+    @Test
+    void findAllShouldReturnList() {
+        when(repository.findAll()).thenReturn(Arrays.asList(testEntity));
+
+        List<{!entityName}> result = service.findAll();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(testEntity.getId());
+    }
+
+    @Test
+    void findByIdShouldReturnEntity() {
+        when(repository.findById(1L)).thenReturn(Optional.of(testEntity));
+
+        Optional<{!entityName}> result = service.findById(1L);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(testEntity.getId());
+    }
+
+    @Test
+    void saveShouldReturnSavedEntity() {
+        when(repository.save(any({!entityName}.class))).thenReturn(testEntity);
+
+        {!entityName} result = service.save(new {!entityName}());
+
+        assertThat(result.getId()).isEqualTo(testEntity.getId());
+    }
+
+    @Test
+    void deleteByIdShouldCallRepository() {
+        service.deleteById(1L);
+
+        verify(repository, times(1)).deleteById(1L);
+    }
+}

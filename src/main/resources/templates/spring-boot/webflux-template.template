@@ -1,0 +1,211 @@
+{!variables}
+basePackage=com.example.demo
+entityName=Entity
+{end_variables}
+
+{!file}build.gradle{end_file}
+// Add these dependencies to your build.gradle
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+    implementation 'io.r2dbc:r2dbc-postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'io.projectreactor.addons:reactor-extra'
+}
+
+{!file}src/main/java/{!basePackage}/config/WebFluxConfig.java{end_file}
+package {!basePackage}.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.reactive.config.EnableWebFlux;
+import org.springframework.web.reactive.config.WebFluxConfigurer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.reactive.function.client.WebClient;
+
+@Configuration
+@EnableWebFlux
+public class WebFluxConfig implements WebFluxConfigurer {
+
+    @Bean
+    public WebClient.Builder webClientBuilder() {
+        return WebClient.builder();
+    }
+
+    @Bean
+    public WebClient webClient(WebClient.Builder webClientBuilder) {
+        return webClientBuilder
+                .baseUrl("https://api.example.com")
+                .build();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/controller/{!entityName}Controller.java{end_file}
+package {!basePackage}.controller;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.service.{!entityName}Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/{!entityName?lower_case}s")
+public class {!entityName}Controller {
+
+    private final {!entityName}Service service;
+
+    public {!entityName}Controller({!entityName}Service service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public Flux<{!entityName}> getAllEntities() {
+        return service.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public Mono<{!entityName}> getEntity(@PathVariable Long id) {
+        return service.findById(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Mono<{!entityName}> createEntity(@Valid @RequestBody Mono<{!entityName}> entity) {
+        return service.save(entity);
+    }
+
+    @PutMapping("/{id}")
+    public Mono<{!entityName}> updateEntity(@PathVariable Long id, 
+                                          @Valid @RequestBody Mono<{!entityName}> entity) {
+        return service.update(id, entity);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> deleteEntity(@PathVariable Long id) {
+        return service.deleteById(id);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/service/{!entityName}Service.java{end_file}
+package {!basePackage}.service;
+
+import {!basePackage}.model.{!entityName};
+import {!basePackage}.repository.{!entityName}Repository;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+public class {!entityName}Service {
+
+    private final {!entityName}Repository repository;
+
+    public {!entityName}Service({!entityName}Repository repository) {
+        this.repository = repository;
+    }
+
+    public Flux<{!entityName}> findAll() {
+        return repository.findAll();
+    }
+
+    public Mono<{!entityName}> findById(Long id) {
+        return repository.findById(id)
+                .switchIfEmpty(Mono.error(new EntityNotFoundException("Entity not found")));
+    }
+
+    public Mono<{!entityName}> save(Mono<{!entityName}> entity) {
+        return entity.flatMap(repository::save);
+    }
+
+    public Mono<{!entityName}> update(Long id, Mono<{!entityName}> entity) {
+        return repository.findById(id)
+                .switchIfEmpty(Mono.error(new EntityNotFoundException("Entity not found")))
+                .flatMap(existing -> entity.map(e -> {
+                    e.setId(existing.getId());
+                    return e;
+                }))
+                .flatMap(repository::save);
+    }
+
+    public Mono<Void> deleteById(Long id) {
+        return repository.deleteById(id);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/repository/{!entityName}Repository.java{end_file}
+package {!basePackage}.repository;
+
+import {!basePackage}.model.{!entityName};
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
+import reactor.core.publisher.Mono;
+
+public interface {!entityName}Repository extends R2dbcRepository<{!entityName}, Long> {
+    Mono<{!entityName}> findByName(String name);
+}
+
+{!file}src/main/java/{!basePackage}/exception/GlobalErrorWebExceptionHandler.java{end_file}
+package {!basePackage}.exception;
+
+import org.springframework.boot.autoconfigure.web.WebProperties;
+import org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler;
+import org.springframework.boot.web.error.ErrorAttributeOptions;
+import org.springframework.boot.web.reactive.error.ErrorAttributes;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerCodecConfigurer;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.server.*;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
+
+@Component
+@Order(-2)
+public class GlobalErrorWebExceptionHandler extends AbstractErrorWebExceptionHandler {
+
+    public GlobalErrorWebExceptionHandler(ErrorAttributes errorAttributes,
+                                       WebProperties webProperties,
+                                       ApplicationContext applicationContext,
+                                       ServerCodecConfigurer serverCodecConfigurer) {
+        super(errorAttributes, webProperties.getResources(), applicationContext);
+        super.setMessageWriters(serverCodecConfigurer.getWriters());
+        super.setMessageReaders(serverCodecConfigurer.getReaders());
+    }
+
+    @Override
+    protected RouterFunction<ServerResponse> getRoutingFunction(ErrorAttributes errorAttributes) {
+        return RouterFunctions.route(RequestPredicates.all(), this::renderErrorResponse);
+    }
+
+    private Mono<ServerResponse> renderErrorResponse(ServerRequest request) {
+        Map<String, Object> errorPropertiesMap = getErrorAttributes(request, 
+            ErrorAttributeOptions.defaults());
+
+        return ServerResponse.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorPropertiesMap));
+    }
+}
+
+{!file}src/main/resources/application.properties{end_file}
+# R2DBC Configuration
+spring.r2dbc.url=r2dbc:postgresql://localhost:5432/demo
+spring.r2dbc.username=postgres
+spring.r2dbc.password=postgres
+
+# Logging
+logging.level.org.springframework.data.r2dbc=DEBUG
+logging.level.io.r2dbc.postgresql.QUERY=DEBUG
+logging.level.io.r2dbc.postgresql.PARAM=DEBUG
+
+# Server Configuration
+server.port=8080
+
+# WebFlux Configuration
+spring.webflux.base-path=/api

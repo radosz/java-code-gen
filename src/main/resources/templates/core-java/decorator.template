@@ -1,0 +1,122 @@
+{!questions}
+projectName=What is your project name (e.g., decorator-pattern)?
+basePackage=What is your base package name (e.g., com.example.patterns)?
+description=Project description (press enter for default):Decorator Pattern implementation for extending object functionality dynamically.
+{end_questions}
+
+{!file}src/main/java/{!basePackage}/decorator/Component.java{end_file}
+package {!basePackage}.decorator;
+
+public interface Component {
+    String operation();
+}
+
+{!file}src/main/java/{!basePackage}/decorator/ConcreteComponent.java{end_file}
+package {!basePackage}.decorator;
+
+public class ConcreteComponent implements Component {
+    @Override
+    public String operation() {
+        return "ConcreteComponent";
+    }
+}
+
+{!file}src/main/java/{!basePackage}/decorator/Decorator.java{end_file}
+package {!basePackage}.decorator;
+
+public abstract class Decorator implements Component {
+    protected Component component;
+
+    public Decorator(Component component) {
+        this.component = component;
+    }
+
+    @Override
+    public String operation() {
+        return component.operation();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/decorator/ConcreteDecoratorA.java{end_file}
+package {!basePackage}.decorator;
+
+public class ConcreteDecoratorA extends Decorator {
+    public ConcreteDecoratorA(Component component) {
+        super(component);
+    }
+
+    @Override
+    public String operation() {
+        return "ConcreteDecoratorA(" + super.operation() + ")";
+    }
+}
+
+{!file}src/main/java/{!basePackage}/decorator/ConcreteDecoratorB.java{end_file}
+package {!basePackage}.decorator;
+
+public class ConcreteDecoratorB extends Decorator {
+    public ConcreteDecoratorB(Component component) {
+        super(component);
+    }
+
+    @Override
+    public String operation() {
+        return "ConcreteDecoratorB(" + super.operation() + ")";
+    }
+}
+
+{!file}README.md{end_file}
+# Decorator Pattern
+
+## Purpose
+The Decorator Pattern attaches additional responsibilities to an object dynamically. Decorators provide a flexible alternative to subclassing for extending functionality.
+
+## Structure
+* Component: Defines the interface for objects that can have responsibilities added to them dynamically
+* ConcreteComponent: Defines an object to which additional responsibilities can be attached
+* Decorator: Maintains a reference to a Component object and defines an interface that conforms to Component's interface
+* ConcreteDecorator: Adds responsibilities to the component
+
+## Example Use Cases
+* When you need to add responsibilities to individual objects dynamically and transparently without affecting other objects
+* When extension by subclassing is impractical
+* When you want to add functionality to an object without changing its interface
+
+## Implementation Notes
+This implementation demonstrates a simple decorator pattern where:
+1. `Component` is an interface with an `operation()` method
+2. `ConcreteComponent` implements the `Component` interface
+3. `Decorator` is an abstract class that implements `Component` and has a reference to a `Component`
+4. `ConcreteDecoratorA` and `ConcreteDecoratorB` extend `Decorator` and add their own behavior
+
+## Sample Usage
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Create a simple component
+        Component component = new ConcreteComponent();
+        System.out.println("Basic component: " + component.operation());
+
+        // Decorate it with DecoratorA
+        Component decoratorA = new ConcreteDecoratorA(component);
+        System.out.println("Component with decorator A: " + decoratorA.operation());
+
+        // Decorate it with DecoratorB
+        Component decoratorB = new ConcreteDecoratorB(component);
+        System.out.println("Component with decorator B: " + decoratorB.operation());
+
+        // Stack decorators
+        Component decoratorAB = new ConcreteDecoratorB(new ConcreteDecoratorA(component));
+        System.out.println("Component with decorator A and B: " + decoratorAB.operation());
+    }
+}
+```
+
+## Output
+```
+Basic component: ConcreteComponent
+Component with decorator A: ConcreteDecoratorA(ConcreteComponent)
+Component with decorator B: ConcreteDecoratorB(ConcreteComponent)
+Component with decorator A and B: ConcreteDecoratorB(ConcreteDecoratorA(ConcreteComponent))
+```
+

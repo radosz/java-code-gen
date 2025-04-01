@@ -1,0 +1,134 @@
+{!questions}
+projectName=What is your project name (e.g., chain-pattern)?
+basePackage=What is your base package name (e.g., com.example.patterns)?
+description=Project description (press enter for default):Chain of Responsibility Pattern implementation for handling requests through a chain of handlers.
+{end_questions}
+
+{!file}src/main/java/{!basePackage}/chain/Handler.java{end_file}
+package {!basePackage}.chain;
+
+public abstract class Handler {
+    protected Handler nextHandler;
+    protected int level;
+
+    public void setNext(Handler handler) {
+        this.nextHandler = handler;
+    }
+
+    public void handleRequest(int level, String message) {
+        if (this.level <= level) {
+            write(message);
+        }
+        if (nextHandler != null) {
+            nextHandler.handleRequest(level, message);
+        }
+    }
+
+    abstract protected void write(String message);
+}
+
+{!file}src/main/java/{!basePackage}/chain/ConsoleLogger.java{end_file}
+package {!basePackage}.chain;
+
+public class ConsoleLogger extends Handler {
+    public ConsoleLogger(int level) {
+        this.level = level;
+    }
+
+    @Override
+    protected void write(String message) {
+        System.out.println("Console: " + message);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/chain/FileLogger.java{end_file}
+package {!basePackage}.chain;
+
+public class FileLogger extends Handler {
+    public FileLogger(int level) {
+        this.level = level;
+    }
+
+    @Override
+    protected void write(String message) {
+        System.out.println("File: " + message);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/chain/ErrorLogger.java{end_file}
+package {!basePackage}.chain;
+
+public class ErrorLogger extends Handler {
+    public ErrorLogger(int level) {
+        this.level = level;
+    }
+
+    @Override
+    protected void write(String message) {
+        System.err.println("Error: " + message);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/chain/LogLevel.java{end_file}
+package {!basePackage}.chain;
+
+public class LogLevel {
+    public static final int INFO = 1;
+    public static final int DEBUG = 2;
+    public static final int ERROR = 3;
+}
+
+{!file}README.md{end_file}
+# Chain of Responsibility Pattern
+
+The Chain of Responsibility Pattern is a behavioral design pattern that lets you pass requests along a chain of handlers. Upon receiving a request, each handler decides either to process the request or to pass it to the next handler in the chain.
+
+## Structure
+
+- **Handler**: Abstract class defining the interface for handling requests and maintaining the next handler in the chain
+- **ConcreteHandler**: Concrete handler classes that implement the handling behavior
+- **Client**: Initiates the request to a handler in the chain
+
+## Implementation
+
+This implementation demonstrates a logging system where different types of loggers form a chain:
+- ConsoleLogger: Logs to console (Level 1 - INFO)
+- FileLogger: Logs to file (Level 2 - DEBUG)
+- ErrorLogger: Logs errors (Level 3 - ERROR)
+
+## Usage
+
+```java
+// Create handlers
+Handler consoleLogger = new ConsoleLogger(LogLevel.INFO);
+Handler fileLogger = new FileLogger(LogLevel.DEBUG);
+Handler errorLogger = new ErrorLogger(LogLevel.ERROR);
+
+// Create the chain
+consoleLogger.setNext(fileLogger);
+fileLogger.setNext(errorLogger);
+
+// Handle requests
+consoleLogger.handleRequest(LogLevel.INFO, "Information message");
+consoleLogger.handleRequest(LogLevel.DEBUG, "Debug message");
+consoleLogger.handleRequest(LogLevel.ERROR, "Error message");
+```
+
+## Output
+```
+Console: Information message
+Console: Debug message
+File: Debug message
+Console: Error message
+File: Error message
+Error: Error message
+```
+
+## Benefits
+
+- Reduces coupling between components
+- Provides flexibility in assigning responsibilities to objects
+- Allows dynamic changes to the chain at runtime
+- Enables single responsibility principle by separating handling logic
+- Common use cases include logging, authentication, and middleware processing
+

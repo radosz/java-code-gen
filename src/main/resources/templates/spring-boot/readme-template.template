@@ -1,0 +1,104 @@
+{!variables}
+applicationName=DemoApplication
+description=Demo project for Spring Boot
+entityName=Entity
+entityNameLower=|TrimNoSpaces: {!entityName}|
+{end_variables}
+
+{!file}README.md{end_file}
+# {!applicationName}
+
+{!description}
+
+## Project Structure
+
+```
+src/
+├── main/
+│   ├── java/
+│   │   └── com/example/demo/
+│   │       ├── controller/
+│   │       │   └── {!entityName}Controller.java
+│   │       ├── model/
+│   │       │   └── {!entityName}.java
+│   │       ├── repository/
+│   │       │   └── {!entityName}Repository.java
+│   │       ├── service/
+│   │       │   └── {!entityName}Service.java
+│   │       └── {!applicationName}.java
+│   └── resources/
+│       └── application.properties
+└── test/
+    └── java/
+        └── com/example/demo/
+            ├── controller/
+            │   └── {!entityName}ControllerTest.java
+            └── service/
+                └── {!entityName}ServiceTest.java
+```
+
+## Requirements
+
+- Java 17 or higher
+- Maven 3.6 or higher
+
+## Getting Started
+
+1. Clone the repository
+```bash
+git clone <repository-url>
+```
+
+2. Build the project
+```bash
+mvn clean install
+```
+
+3. Run the application
+```bash
+mvn spring-boot:run
+```
+
+The application will start on http://localhost:8080
+
+## API Endpoints
+
+### {!entityName} Controller
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | /api/{!entityNameLower}s | Get all entities |
+| GET    | /api/{!entityNameLower}s/{id} | Get entity by ID |
+| POST   | /api/{!entityNameLower}s | Create new entity |
+| PUT    | /api/{!entityNameLower}s/{id} | Update entity |
+| DELETE | /api/{!entityNameLower}s/{id} | Delete entity |
+
+## Database
+
+The application uses H2 in-memory database. You can access the H2 console at http://localhost:8080/h2-console
+
+Database connection details:
+- JDBC URL: jdbc:h2:mem:testdb
+- Username: sa
+- Password: (empty)
+
+## Testing
+
+Run the tests using:
+```bash
+mvn test
+```
+
+## API Documentation
+
+The API documentation is available at:
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- OpenAPI: http://localhost:8080/v3/api-docs
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request

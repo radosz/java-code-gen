@@ -1,0 +1,78 @@
+{!variables}
+basePackage=com.example.demo
+applicationName=DemoApplication
+artifactId=demo
+groupId=com.example
+version=0.0.1-SNAPSHOT
+description=Demo project for Spring Boot
+{end_variables}
+
+{!file}src/main/resources/application.properties{end_file}
+# Server Configuration
+server.port=8080
+
+# Database Configuration
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+
+# H2 Console
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# JPA/Hibernate
+spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=update
+
+# Logging
+logging.level.root=INFO
+logging.level.{!basePackage}=DEBUG
+
+{!file}build.gradle{end_file}
+plugins {
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'java'
+}
+
+group = '{!basePackage}'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+bootJar {
+    layered {
+        enabled = true
+    }
+}
+
+{!file}src/main/java/{!basePackage}/{!applicationName}.java{end_file}
+package {!basePackage};
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class {!applicationName} {
+    public static void main(String[] args) {
+        SpringApplication.run({!applicationName}.class, args);
+    }
+}

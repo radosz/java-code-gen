@@ -1,0 +1,125 @@
+{!questions}
+projectName=What is your project name (e.g., observer-pattern)?
+basePackage=What is your base package name (e.g., com.example.patterns)?
+description=Project description (press enter for default):Observer Pattern implementation with subject and observers.
+{end_questions}
+
+{!file}src/main/java/{!basePackage}/observer/Subject.java{end_file}
+package {!basePackage}.observer;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Subject {
+    private List<Observer> observers = new ArrayList<>();
+    private int state;
+
+    public int getState() {
+        return state;
+    }
+
+    public void setState(int state) {
+        this.state = state;
+        notifyAllObservers();
+    }
+
+    public void attach(Observer observer) {
+        observers.add(observer);
+    }
+
+    public void notifyAllObservers() {
+        observers.forEach(Observer::update);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/observer/Observer.java{end_file}
+package {!basePackage}.observer;
+
+public abstract class Observer {
+    protected Subject subject;
+    public abstract void update();
+}
+
+{!file}src/main/java/{!basePackage}/observer/BinaryObserver.java{end_file}
+package {!basePackage}.observer;
+
+public class BinaryObserver extends Observer {
+    public BinaryObserver(Subject subject) {
+        this.subject = subject;
+        this.subject.attach(this);
+    }
+
+    @Override
+    public void update() {
+        System.out.println("Binary String: " + Integer.toBinaryString(subject.getState()));
+    }
+}
+
+{!file}src/main/java/{!basePackage}/observer/HexObserver.java{end_file}
+package {!basePackage}.observer;
+
+public class HexObserver extends Observer {
+    public HexObserver(Subject subject) {
+        this.subject = subject;
+        this.subject.attach(this);
+    }
+
+    @Override
+    public void update() {
+        System.out.println("Hex String: " + Integer.toHexString(subject.getState()));
+    }
+}
+
+{!file}README.md{end_file}
+# Observer Pattern
+
+## Purpose
+The Observer Pattern defines a one-to-many dependency between objects so that when one object changes state, all its dependents are notified and updated automatically.
+
+## Structure
+* Subject: Knows its observers and provides an interface for attaching and detaching Observer objects
+* Observer: Defines an updating interface for objects that should be notified of changes in a Subject
+* ConcreteSubject: Stores state of interest to ConcreteObserver objects and sends notifications when its state changes
+* ConcreteObserver: Maintains a reference to a ConcreteSubject object and implements the Observer updating interface
+
+## Example Use Cases
+* When a change to one object requires changing others, and you don't know how many objects need to be changed
+* When an object should be able to notify other objects without making assumptions about who these objects are
+* When an abstraction has two aspects, with one dependent on the other
+
+## Implementation Notes
+This implementation demonstrates a simple observer pattern where:
+1. `Subject` maintains a list of observers and notifies them when its state changes
+2. `Observer` is an abstract class that defines the update method
+3. `BinaryObserver` and `HexObserver` are concrete observers that display the subject's state in different formats
+
+## Sample Usage
+```java
+public class Main {
+    public static void main(String[] args) {
+        Subject subject = new Subject();
+
+        // Create observers that will be notified of state changes
+        new BinaryObserver(subject);
+        new HexObserver(subject);
+
+        // Change subject state
+        System.out.println("First state change: 15");
+        subject.setState(15);
+        
+        System.out.println("Second state change: 10");
+        subject.setState(10);
+    }
+}
+```
+
+## Output
+```
+First state change: 15
+Binary String: 1111
+Hex String: f
+Second state change: 10
+Binary String: 1010
+Hex String: a
+```
+

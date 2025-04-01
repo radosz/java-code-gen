@@ -1,0 +1,305 @@
+{!variables}
+basePackage=com.example.demo
+awsRegion=us-east-1
+{end_variables}
+
+{!file}build.gradle{end_file}
+plugins {
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'java'
+}
+
+group = '{!basePackage}'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // AWS SDK
+    implementation platform('software.amazon.awssdk:bom:2.20.43')
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:sqs'
+    implementation 'software.amazon.awssdk:dynamodb'
+    implementation 'software.amazon.awssdk:secretsmanager'
+    implementation 'software.amazon.awssdk:ssm'
+    implementation 'com.amazonaws.serverless:aws-serverless-java-container-springboot2:1.9.1'
+    
+    // Spring Cloud AWS
+    implementation 'org.springframework.cloud:spring-cloud-starter-aws'
+    implementation 'org.springframework.cloud:spring-cloud-starter-aws-messaging'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+bootJar {
+    layered {
+        enabled = true
+    }
+}
+
+{!file}src/main/java/{!basePackage}/config/AwsConfig.java{end_file}
+package {!basePackage}.config;
+
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class AwsConfig {
+
+    @Bean
+    public S3Client s3Client() {
+        return S3Client.builder()
+                .region(Region.of("{!awsRegion}"))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
+    }
+
+    @Bean
+    public SqsClient sqsClient() {
+        return SqsClient.builder()
+                .region(Region.of("{!awsRegion}"))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
+    }
+
+    @Bean
+    public DynamoDbClient dynamoDbClient() {
+        return DynamoDbClient.builder()
+                .region(Region.of("{!awsRegion}"))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
+    }
+
+    @Bean
+    public SecretsManagerClient secretsManagerClient() {
+        return SecretsManagerClient.builder()
+                .region(Region.of("{!awsRegion}"))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/service/S3Service.java{end_file}
+package {!basePackage}.service;
+
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.*;
+import org.springframework.stereotype.Service;
+import java.io.InputStream;
+
+@Service
+public class S3Service {
+
+    private final S3Client s3Client;
+
+    public S3Service(S3Client s3Client) {
+        this.s3Client = s3Client;
+    }
+
+    public void uploadFile(String bucketName, String key, InputStream inputStream) {
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+
+        s3Client.putObject(request, RequestBody.fromInputStream(inputStream, inputStream.available()));
+    }
+
+    public InputStream downloadFile(String bucketName, String key) {
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+
+        return s3Client.getObject(request);
+    }
+
+    public void deleteFile(String bucketName, String key) {
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+
+        s3Client.deleteObject(request);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/service/SqsService.java{end_file}
+package {!basePackage}.service;
+
+import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.*;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class SqsService {
+
+    private final SqsClient sqsClient;
+
+    public SqsService(SqsClient sqsClient) {
+        this.sqsClient = sqsClient;
+    }
+
+    public void sendMessage(String queueUrl, String message) {
+        SendMessageRequest request = SendMessageRequest.builder()
+                .queueUrl(queueUrl)
+                .messageBody(message)
+                .build();
+
+        sqsClient.sendMessage(request);
+    }
+
+    public List<Message> receiveMessages(String queueUrl) {
+        ReceiveMessageRequest request = ReceiveMessageRequest.builder()
+                .queueUrl(queueUrl)
+                .maxNumberOfMessages(10)
+                .waitTimeSeconds(20)
+                .build();
+
+        return sqsClient.receiveMessage(request).messages();
+    }
+
+    public void deleteMessage(String queueUrl, Message message) {
+        DeleteMessageRequest request = DeleteMessageRequest.builder()
+                .queueUrl(queueUrl)
+                .receiptHandle(message.receiptHandle())
+                .build();
+
+        sqsClient.deleteMessage(request);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/service/DynamoDbService.java{end_file}
+package {!basePackage}.service;
+
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.*;
+import org.springframework.stereotype.Service;
+import java.util.Map;
+
+@Service
+public class DynamoDbService {
+
+    private final DynamoDbClient dynamoDbClient;
+
+    public DynamoDbService(DynamoDbClient dynamoDbClient) {
+        this.dynamoDbClient = dynamoDbClient;
+    }
+
+    public void putItem(String tableName, Map<String, AttributeValue> item) {
+        PutItemRequest request = PutItemRequest.builder()
+                .tableName(tableName)
+                .item(item)
+                .build();
+
+        dynamoDbClient.putItem(request);
+    }
+
+    public Map<String, AttributeValue> getItem(String tableName, Map<String, AttributeValue> key) {
+        GetItemRequest request = GetItemRequest.builder()
+                .tableName(tableName)
+                .key(key)
+                .build();
+
+        return dynamoDbClient.getItem(request).item();
+    }
+
+    public void deleteItem(String tableName, Map<String, AttributeValue> key) {
+        DeleteItemRequest request = DeleteItemRequest.builder()
+                .tableName(tableName)
+                .key(key)
+                .build();
+
+        dynamoDbClient.deleteItem(request);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/lambda/LambdaHandler.java{end_file}
+package {!basePackage}.lambda;
+
+import com.amazonaws.serverless.exceptions.ContainerInitializationException;
+import com.amazonaws.serverless.proxy.model.AwsProxyRequest;
+import com.amazonaws.serverless.proxy.model.AwsProxyResponse;
+import com.amazonaws.serverless.proxy.spring.SpringBootLambdaContainerHandler;
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
+import {!basePackage}.Application;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+public class LambdaHandler implements RequestStreamHandler {
+
+    private static SpringBootLambdaContainerHandler<AwsProxyRequest, AwsProxyResponse> handler;
+
+    static {
+        try {
+            handler = SpringBootLambdaContainerHandler.getAwsProxyHandler(Application.class);
+        } catch (ContainerInitializationException e) {
+            throw new RuntimeException("Could not initialize Spring Boot application", e);
+        }
+    }
+
+    @Override
+    public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context)
+            throws IOException {
+        handler.proxyStream(inputStream, outputStream, context);
+    }
+}
+
+{!file}src/main/resources/application.yml{end_file}
+cloud:
+  aws:
+    region:
+      static: {!awsRegion}
+    stack:
+      auto: false
+    credentials:
+      instance-profile: true
+
+aws:
+  s3:
+    bucket: your-bucket-name
+  sqs:
+    queue-url: your-queue-url
+  dynamodb:
+    table-name: your-table-name
+
+{!file}template.yaml{end_file}
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM template for Spring Boot Lambda application
+
+Resources:
+  SpringBootFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: {!basePackage}.lambda.LambdaHandler::handleRequest
+      Runtime: java17
+      CodeUri: build/distributions/application.zip
+      MemorySize: 512
+      Timeout: 30
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: any

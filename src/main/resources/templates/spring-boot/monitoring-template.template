@@ -1,0 +1,272 @@
+{!variables}
+basePackage=com.example.demo
+applicationName=DemoApplication
+{end_variables}
+
+{!file}build.gradle{end_file}
+// Add these dependencies to your build.gradle
+dependencies {
+    // Monitoring & Metrics
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
+}
+
+{!file}src/main/java/{!basePackage}/config/MetricsConfig.java{end_file}
+package {!basePackage}.config;
+
+import io.micrometer.core.aop.TimedAspect;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MetricsConfig {
+
+    @Bean
+    public TimedAspect timedAspect(MeterRegistry registry) {
+        return new TimedAspect(registry);
+    }
+}
+
+{!file}src/main/java/{!basePackage}/actuator/CustomHealthIndicator.java{end_file}
+package {!basePackage}.actuator;
+
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CustomHealthIndicator implements HealthIndicator {
+
+    @Override
+    public Health health() {
+        try {
+            // Add your health check logic here
+            return Health.up()
+                    .withDetail("app", "Healthy")
+                    .withDetail("error", "None")
+                    .build();
+        } catch (Exception e) {
+            return Health.down()
+                    .withDetail("app", "Not Healthy")
+                    .withDetail("error", e.getMessage())
+                    .build();
+        }
+    }
+}
+
+{!file}src/main/java/{!basePackage}/metrics/MetricsService.java{end_file}
+package {!basePackage}.metrics;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MetricsService {
+
+    private final Counter requestCounter;
+    private final Timer requestTimer;
+
+    public MetricsService(MeterRegistry registry) {
+        this.requestCounter = Counter.builder("app.requests.total")
+                .description("Total number of requests")
+                .register(registry);
+
+        this.requestTimer = Timer.builder("app.requests.latency")
+                .description("Request latency")
+                .register(registry);
+    }
+
+    public void incrementRequestCount() {
+        requestCounter.increment();
+    }
+
+    public Timer getRequestTimer() {
+        return requestTimer;
+    }
+}
+
+{!file}src/main/resources/application.properties{end_file}
+# Actuator Configuration
+management.endpoints.web.exposure.include=health,metrics,prometheus,info
+management.endpoint.health.show-details=always
+management.endpoint.metrics.enabled=true
+management.endpoint.prometheus.enabled=true
+management.metrics.tags.application=${spring.application.name}
+management.metrics.distribution.percentiles-histogram.http.server.requests=true
+
+# Tracing Configuration
+management.tracing.sampling.probability=1.0
+management.zipkin.tracing.endpoint=http://localhost:9411/api/v2/spans
+
+{!file}docker/prometheus/prometheus.yml{end_file}
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'spring-boot-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+
+{!file}docker/grafana/provisioning/dashboards/dashboard.yml{end_file}
+apiVersion: 1
+
+providers:
+  - name: 'Default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+
+{!file}docker/grafana/provisioning/dashboards/spring-boot-metrics.json{end_file}
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(app_requests_total[5m])",
+          "refId": "A"
+        }
+      ],
+      "title": "Request Rate",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Spring Boot Metrics",
+  "version": 0,
+  "weekStart": ""
+}
+
+{!file}docker-compose.yml{end_file}
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - monitoring
+
+  zipkin:
+    image: openzipkin/zipkin:2.24
+    ports:
+      - "9411:9411"
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge

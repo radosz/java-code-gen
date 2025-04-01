@@ -1,0 +1,134 @@
+{!variables}
+applicationName=DemoApplication
+artifactId=demo
+version=0.0.1-SNAPSHOT
+postgresUser=postgres
+postgresPassword=postgres
+postgresDb=demo
+{end_variables}
+
+{!file}Dockerfile{end_file}
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+COPY target/{!artifactId}-{!version}.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
+
+{!file}docker-compose.yml{end_file}
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/{!postgresDb}
+      - SPRING_DATASOURCE_USERNAME={!postgresUser}
+      - SPRING_DATASOURCE_PASSWORD={!postgresPassword}
+    depends_on:
+      - db
+    networks:
+      - spring-postgres
+
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB={!postgresDb}
+      - POSTGRES_USER={!postgresUser}
+      - POSTGRES_PASSWORD={!postgresPassword}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - spring-postgres
+
+volumes:
+  postgres-data:
+
+networks:
+  spring-postgres:
+    driver: bridge
+
+{!file}src/main/resources/application-docker.properties{end_file}
+# Server Configuration
+server.port=8080
+
+# Database Configuration
+spring.datasource.url=jdbc:postgresql://db:5432/${POSTGRES_DB:demo}
+spring.datasource.username=${POSTGRES_USER:postgres}
+spring.datasource.password=${POSTGRES_PASSWORD:postgres}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=update
+
+# Logging
+logging.level.root=INFO
+logging.level.com.example.demo=DEBUG
+
+{!file}docker.sh{end_file}
+#!/bin/bash
+
+case "$1" in
+  "build")
+    echo "Building application..."
+    ./mvnw clean package -DskipTests
+    echo "Building Docker image..."
+    docker-compose build
+    ;;
+    
+  "up")
+    echo "Starting containers..."
+    docker-compose up -d
+    ;;
+    
+  "down")
+    echo "Stopping containers..."
+    docker-compose down
+    ;;
+    
+  "logs")
+    echo "Showing logs..."
+    docker-compose logs -f
+    ;;
+    
+  "clean")
+    echo "Cleaning up..."
+    docker-compose down -v
+    docker-compose rm -f
+    ;;
+    
+  *)
+    echo "Usage: $0 {build|up|down|logs|clean}"
+    exit 1
+    ;;
+esac
+
+{!file}src/main/java/{!basePackage}/config/DockerPostgresConfig.java{end_file}
+package com.example.demo.config;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import javax.sql.DataSource;
+
+@Configuration
+@Profile("docker")
+public class DockerPostgresConfig {
+
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource")
+    public DataSource dataSource() {
+        return DataSourceBuilder.create().build();
+    }
+}

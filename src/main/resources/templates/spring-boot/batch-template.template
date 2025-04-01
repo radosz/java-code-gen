@@ -1,0 +1,214 @@
+{!variables}
+basePackage=com.example.demo
+entityName=Entity
+batchName=SampleBatch
+{end_variables}
+
+{!file}build.gradle{end_file}
+// Add these dependencies to your build.gradle
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    implementation 'org.springframework.boot:spring-boot-starter-quartz'
+    runtimeOnly 'org.postgresql:postgresql'
+}
+
+{!file}src/main/java/{!basePackage}/config/BatchConfig.java{end_file}
+package {!basePackage}.config;
+
+import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
+import org.springframework.batch.core.configuration.support.DefaultBatchConfiguration;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import javax.sql.DataSource;
+
+@Configuration
+@EnableBatchProcessing
+public class BatchConfig extends DefaultBatchConfiguration {
+    private final DataSource dataSource;
+    private final PlatformTransactionManager transactionManager;
+
+    public BatchConfig(DataSource dataSource, PlatformTransactionManager transactionManager) {
+        this.dataSource = dataSource;
+        this.transactionManager = transactionManager;
+    }
+
+    @Override
+    protected DataSource getDataSource() {
+        return dataSource;
+    }
+
+    @Override
+    protected PlatformTransactionManager getTransactionManager() {
+        return transactionManager;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/batch/job/{!batchName}JobConfig.java{end_file}
+package {!basePackage}.batch.job;
+
+import {!basePackage}.model.{!entityName};
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.JobScope;
+import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import javax.sql.DataSource;
+
+@Configuration
+public class {!batchName}JobConfig {
+
+    private final JobRepository jobRepository;
+    private final PlatformTransactionManager transactionManager;
+
+    public {!batchName}JobConfig(JobRepository jobRepository,
+                            PlatformTransactionManager transactionManager) {
+        this.jobRepository = jobRepository;
+        this.transactionManager = transactionManager;
+    }
+
+    @Bean
+    public Job {!batchName}Job(Step {!batchName}Step) {
+        return new JobBuilder("{!batchName}Job", jobRepository)
+                .listener(new {!batchName}JobExecutionListener())
+                .start({!batchName}Step)
+                .build();
+    }
+
+    @Bean
+    public Step {!batchName}Step(
+            FlatFileItemReader<{!entityName}> reader,
+            {!entityName}Processor processor,
+            JdbcBatchItemWriter<{!entityName}> writer) {
+        
+        return new StepBuilder("{!batchName}Step", jobRepository)
+                .<{!entityName}, {!entityName}>chunk(10, transactionManager)
+                .reader(reader)
+                .processor(processor)
+                .writer(writer)
+                .build();
+    }
+
+    @Bean
+    @JobScope
+    public FlatFileItemReader<{!entityName}> reader(
+            @Value("#{jobParameters['inputFile']}") Resource inputFile) {
+        return new FlatFileItemReaderBuilder<{!entityName}>()
+                .name("{!entityName}ItemReader")
+                .resource(inputFile)
+                .delimited()
+                .names("field1", "field2") // Add your CSV column names
+                .targetType({!entityName}.class)
+                .build();
+    }
+
+    @Bean
+    public JdbcBatchItemWriter<{!entityName}> writer(DataSource dataSource) {
+        return new JdbcBatchItemWriterBuilder<{!entityName}>()
+                .sql("INSERT INTO entity (field1, field2) VALUES (:field1, :field2)")
+                .dataSource(dataSource)
+                .beanMapped()
+                .build();
+    }
+}
+
+{!file}src/main/java/{!basePackage}/batch/processor/{!entityName}Processor.java{end_file}
+package {!basePackage}.batch.processor;
+
+import {!basePackage}.model.{!entityName};
+import org.springframework.batch.item.ItemProcessor;
+import org.springframework.stereotype.Component;
+
+@Component
+public class {!entityName}Processor implements ItemProcessor<{!entityName}, {!entityName}> {
+
+    @Override
+    public {!entityName} process({!entityName} item) throws Exception {
+        // Add your processing logic here
+        return item;
+    }
+}
+
+{!file}src/main/java/{!basePackage}/batch/listener/{!batchName}JobExecutionListener.java{end_file}
+package {!basePackage}.batch.listener;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobExecutionListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class {!batchName}JobExecutionListener implements JobExecutionListener {
+
+    private static final Logger logger = LoggerFactory.getLogger({!batchName}JobExecutionListener.class);
+
+    @Override
+    public void beforeJob(JobExecution jobExecution) {
+        logger.info("Starting job: {}", jobExecution.getJobInstance().getJobName());
+    }
+
+    @Override
+    public void afterJob(JobExecution jobExecution) {
+        logger.info("Job finished with status: {}", jobExecution.getStatus());
+    }
+}
+
+{!file}src/main/java/{!basePackage}/scheduler/BatchJobScheduler.java{end_file}
+package {!basePackage}.scheduler;
+
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+@Component
+@EnableScheduling
+public class BatchJobScheduler {
+
+    private final JobLauncher jobLauncher;
+    private final Job {!batchName}Job;
+
+    public BatchJobScheduler(JobLauncher jobLauncher, Job {!batchName}Job) {
+        this.jobLauncher = jobLauncher;
+        this.{!batchName}Job = {!batchName}Job;
+    }
+
+    @Scheduled(cron = "0 0 1 * * ?") // Run at 1 AM every day
+    public void runJob() throws Exception {
+        JobParameters params = new JobParametersBuilder()
+                .addString("inputFile", "classpath:data/input.csv")
+                .addLong("time", System.currentTimeMillis())
+                .toJobParameters();
+
+        jobLauncher.run({!batchName}Job, params);
+    }
+}
+
+{!file}src/main/resources/application.properties{end_file}
+# Batch Configuration
+spring.batch.jdbc.initialize-schema=always
+spring.batch.job.enabled=false
+
+# Datasource Configuration for Batch Meta-data
+spring.datasource.url=jdbc:postgresql://localhost:5432/batch
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# Batch Job Configuration
+batch.input-path=classpath:data/input.csv
+batch.chunk-size=100

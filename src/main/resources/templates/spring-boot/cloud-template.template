@@ -1,0 +1,212 @@
+{!variables}
+basePackage=com.example.demo
+applicationName=DemoService
+{end_variables}
+
+{!file}build.gradle{end_file}
+// Add these dependencies to your build.gradle
+dependencies {
+    // Spring Cloud
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
+}
+
+{!file}src/main/java/{!basePackage}/config/CloudConfig.java{end_file}
+package {!basePackage}.config;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.timelimiter.TimeLimiterConfig;
+import org.springframework.cloud.circuitbreaker.resilience4j.ReactiveResilience4JCircuitBreakerFactory;
+import org.springframework.cloud.circuitbreaker.resilience4j.Resilience4JConfigBuilder;
+import org.springframework.cloud.client.circuitbreaker.Customizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.time.Duration;
+
+@Configuration
+public class CloudConfig {
+
+    @Bean
+    public Customizer<ReactiveResilience4JCircuitBreakerFactory> defaultCustomizer() {
+        return factory -> factory.configureDefault(id -> new Resilience4JConfigBuilder(id)
+                .circuitBreakerConfig(CircuitBreakerConfig.custom()
+                        .slidingWindowSize(10)
+                        .failureRateThreshold(50)
+                        .waitDurationInOpenState(Duration.ofSeconds(10))
+                        .build())
+                .timeLimiterConfig(TimeLimiterConfig.custom()
+                        .timeoutDuration(Duration.ofSeconds(3))
+                        .build())
+                .build());
+    }
+}
+
+{!file}src/main/java/{!basePackage}/client/ExternalServiceClient.java{end_file}
+package {!basePackage}.client;
+
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreakerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+@Component
+public class ExternalServiceClient {
+
+    private final WebClient webClient;
+    private final ReactiveCircuitBreaker circuitBreaker;
+
+    public ExternalServiceClient(WebClient.Builder webClientBuilder,
+                               ReactiveCircuitBreakerFactory circuitBreakerFactory) {
+        this.webClient = webClientBuilder
+                .baseUrl("http://external-service")
+                .build();
+        this.circuitBreaker = circuitBreakerFactory.create("external-service");
+    }
+
+    public Mono<String> callExternalService() {
+        return circuitBreaker.run(
+            webClient.get()
+                .uri("/api/resource")
+                .retrieve()
+                .bodyToMono(String.class),
+            throwable -> Mono.just("Fallback response")
+        );
+    }
+}
+
+{!file}src/main/java/{!basePackage}/gateway/GatewayConfig.java{end_file}
+package {!basePackage}.gateway;
+
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class GatewayConfig {
+
+    @Bean
+    public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
+        return builder.routes()
+                .route("service_route", r -> r
+                        .path("/api/**")
+                        .filters(f -> f
+                                .circuitBreaker(config -> config
+                                        .setName("serviceCircuitBreaker")
+                                        .setFallbackUri("forward:/fallback"))
+                                .rewritePath("/api/(?<segment>.*)", "/${segment}"))
+                        .uri("lb://service-name"))
+                .build();
+    }
+}
+
+{!file}src/main/resources/application.yml{end_file}
+spring:
+  application:
+    name: {!applicationName}
+  cloud:
+    config:
+      enabled: true
+      uri: http://config-server:8888
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lowerCaseServiceId: true
+  config:
+    import: "optional:configserver:"
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    preferIpAddress: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 3
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+{!file}docker-compose.yml{end_file}
+version: '3.8'
+
+services:
+  config-server:
+    image: config-server:latest
+    ports:
+      - "8888:8888"
+    networks:
+      - spring-cloud-network
+
+  eureka-server:
+    image: eureka-server:latest
+    ports:
+      - "8761:8761"
+    networks:
+      - spring-cloud-network
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    ports:
+      - "9411:9411"
+    networks:
+      - spring-cloud-network
+
+  gateway:
+    image: gateway:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - config-server
+      - eureka-server
+    networks:
+      - spring-cloud-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+
+  app:
+    image: {!applicationName?lower_case}:latest
+    depends_on:
+      - config-server
+      - eureka-server
+      - gateway
+    networks:
+      - spring-cloud-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+
+networks:
+  spring-cloud-network:
+    driver: bridge
